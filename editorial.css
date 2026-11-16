@@ -142,3 +142,18 @@ body.sinpiezas #main .empty{display:none}
 .cam-bar button{height:38px;padding:0 16px;border-radius:8px;border:1px solid #555;background:#222;color:#fff;cursor:pointer}
 .cam-bar .cam-snap{background:#fff;color:#111;border-color:#fff}
 .cam-msg{color:#fff;max-width:420px;text-align:center}
+
+.ret{position:fixed;inset:0;z-index:410;background:rgba(20,20,20,.92);display:grid;place-items:center;padding:12px}
+.ret-in{display:grid;gap:10px;max-width:min(1100px,100%);max-height:100%;grid-template-rows:minmax(0,1fr) auto}
+.ret-lienzo{min-height:0;display:grid;place-items:center;overflow:hidden}
+.ret-lienzo canvas{max-width:100%;max-height:calc(100vh - 210px);touch-action:none;background-color:#fff;background-image:linear-gradient(45deg,#e6e6e3 25%,transparent 25%,transparent 75%,#e6e6e3 75%),linear-gradient(45deg,#e6e6e3 25%,transparent 25%,transparent 75%,#e6e6e3 75%);background-size:16px 16px;background-position:0 0,8px 8px;border:1px solid #555}
+.ret-bar{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;justify-content:center;background:var(--bg);padding:10px 12px;border:1px solid var(--rule)}
+.ret-fila{display:flex;flex-wrap:wrap;gap:6px 8px;align-items:center}
+.ret-bar button{height:28px;padding:0 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);cursor:pointer}
+.ret-bar button[aria-pressed=true]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.ret-bar button:disabled{opacity:.4;cursor:default}
+.ret-bar button.sello{height:auto;padding:7px 16px;border:2px solid currentColor;background:none;color:var(--sello)}
+.ret-bar label{display:inline-flex;align-items:center;gap:6px;color:var(--muted)}
+.ret-bar input[type=range]{width:110px}
+.ret-fin{margin-left:auto}
+.ret-ayuda{margin:0;width:100%;text-align:center;font-size:11px}
