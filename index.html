@@ -714,9 +714,14 @@ details.blk:not([open]),#d-sel details.sec:not([open]){padding-bottom:0!importan
   <span class="lbl">Tu archivo personal</span>
   <h1 id="ac-t">your personal archive</h1>
   <p class="ac-p">Guarda los objetos que conservas y mira cómo la memoria los enfoca, los apaga o los devuelve. Cada cuenta tiene su propio archivo, privado.</p>
-  <form id="acForm"><label class="mono" for="acMail">Tu correo</label>
-    <div class="wrow"><input id="acMail" type="email" required autocomplete="email" placeholder="tu@correo.com"><button id="acBtn" class="mono">Entrar</button></div>
-    <p class="mono muted" id="acMsg">Te enviamos un enlace para entrar. Sin contraseñas.</p></form>
+  <form id="acForm">
+    <div class="ac-tabs mono"><button type="button" id="acTabIn" aria-pressed="true">Entrar</button><button type="button" id="acTabUp" aria-pressed="false">Crear cuenta</button></div>
+    <div class="ac-f" id="acFMail"><label class="mono" for="acMail">Tu correo</label><input id="acMail" type="email" required autocomplete="email" placeholder="tu@correo.com"></div>
+    <div class="ac-f" id="acFPass"><label class="mono" for="acPass" id="acLPass">Contraseña</label><input id="acPass" type="password" required autocomplete="current-password" placeholder="Mínimo 8 caracteres"></div>
+    <button id="acBtn" class="mono">Entrar</button>
+    <p class="mono muted" id="acMsg"></p>
+    <p class="mono ac-links"><button type="button" id="acOlvido">He olvidado la contraseña</button><span>·</span><button type="button" id="acLink">Entrar con un enlace al correo</button></p>
+  </form>
 </div></div>
 <div id="vacio" hidden><div class="ac-caja"><span class="lbl">Archivo vacío</span><p class="ac-p">Todavía no hay nada aquí. Empieza por el objeto que más te cueste tirar.</p><button id="vacioAdd" class="mono">Añadir la primera pieza</button></div></div>
 <div class="umbral" id="umbral" role="dialog" aria-modal="true" aria-labelledby="u-t"><div class="u-libro">
@@ -2259,23 +2264,79 @@ async function entrarCuenta(user){
 }
 function salirCuenta(){
   UID=null;clearInterval(firmaT);STORE.clear();LOCALURL.clear();TURL.clear();THUMB.clear();EXTM={};
-  Q.sucios.clear();Q.borrados.clear();emitir();desactivar();mostrarAcceso();
+  Q.sucios.clear();Q.borrados.clear();emitir();desactivar();acModoSet("in");$("#acPass").value="";mostrarAcceso();
+}
+let recuperando=false,acModo="in";
+function acModoSet(m){
+  acModo=m;
+  $("#acTabIn").setAttribute("aria-pressed",String(m==="in"));$("#acTabUp").setAttribute("aria-pressed",String(m==="up"));
+  document.querySelector(".ac-tabs").hidden=m==="nueva";
+  $("#acFMail").hidden=m==="nueva";$("#acMail").required=m!=="nueva";
+  $("#acLPass").textContent=m==="nueva"?"Contraseña nueva":"Contraseña";
+  $("#acPass").autocomplete=m==="in"?"current-password":"new-password";$("#acPass").minLength=m==="in"?0:8;
+  $("#acBtn").textContent=m==="up"?"Crear cuenta":m==="nueva"?"Guardar contraseña":"Entrar";
+  document.querySelector(".ac-links").hidden=m==="nueva";
+  acMsg("");
+}
+function errAuth(e){
+  const m=(e.message||"").toLowerCase(),c=e.code||"";
+  if(c==="invalid_credentials"||m.includes("invalid login"))return "Correo o contraseña incorrectos.";
+  if(c==="email_not_confirmed"||m.includes("not confirmed"))return "Todavía no has confirmado el correo. Abre el enlace que te enviamos al crear la cuenta.";
+  if(c==="user_already_exists"||m.includes("already registered"))return "Ya hay una cuenta con ese correo. Entra con tu contraseña o recupérala.";
+  if(c==="weak_password"||m.includes("password should"))return "La contraseña es demasiado débil: usa al menos 8 caracteres.";
+  if(e.status===429||c==="over_email_send_rate_limit"||m.includes("rate limit"))return "Demasiados correos seguidos. Espera un poco y vuelve a probar.";
+  return "No se pudo completar: "+(e.message||e);
 }
 sb.auth.onAuthStateChange((ev,ses)=>{
   // sin llamar a la API de Supabase desde aquí dentro: se difiere para no bloquear el cliente
-  setTimeout(()=>{if(ses&&ses.user)entrarCuenta(ses.user);else if(ev==="INITIAL_SESSION"||ev==="SIGNED_OUT")salirCuenta();},0);
+  setTimeout(()=>{
+    if(ev==="PASSWORD_RECOVERY"){recuperando=true;mostrarAcceso();acModoSet("nueva");acMsg("Elige una contraseña nueva para tu cuenta.");return;}
+    if(recuperando)return;
+    if(ses&&ses.user)entrarCuenta(ses.user);else if(ev==="INITIAL_SESSION"||ev==="SIGNED_OUT")salirCuenta();
+  },0);
 });
 $("#loginBtn").onclick=()=>{
   if(UID){if(pendiente()){estado("Espera a que se guarde antes de salir","err");return;}sb.auth.signOut();}
   else mostrarAcceso();
 };
+$("#acTabIn").onclick=()=>acModoSet("in");
+$("#acTabUp").onclick=()=>acModoSet("up");
 $("#acForm").onsubmit=async e=>{
-  e.preventDefault();const mail=$("#acMail").value.trim(),btn=$("#acBtn");if(!mail)return;
-  btn.disabled=true;acMsg("Enviando…");
+  e.preventDefault();const mail=$("#acMail").value.trim(),pass=$("#acPass").value,btn=$("#acBtn");
+  btn.disabled=true;
+  try{
+    if(acModo==="nueva"){
+      acMsg("Guardando…");
+      const {error}=await sb.auth.updateUser({password:pass});
+      if(error){acMsg(errAuth(error),true);return;}
+      recuperando=false;acModoSet("in");$("#acPass").value="";
+      const {data}=await sb.auth.getSession();if(data.session)entrarCuenta(data.session.user);
+    }else if(acModo==="up"){
+      acMsg("Creando la cuenta…");
+      const {data,error}=await sb.auth.signUp({email:mail,password:pass,options:{emailRedirectTo:location.origin+location.pathname}});
+      if(error)acMsg(errAuth(error),true);
+      else if(data&&data.session)acMsg("");
+      else acMsg("Cuenta creada. Te hemos enviado un enlace a "+mail+" para confirmar el correo; después entra con tu contraseña.");
+    }else{
+      acMsg("Entrando…");
+      const {error}=await sb.auth.signInWithPassword({email:mail,password:pass});
+      if(error)acMsg(errAuth(error),true);
+    }
+  }finally{btn.disabled=false;}
+};
+$("#acOlvido").onclick=async()=>{
+  const mail=$("#acMail").value.trim();
+  if(!mail){acMsg("Escribe tu correo arriba y vuelve a pulsar.",true);$("#acMail").focus();return;}
+  acMsg("Enviando…");
+  const {error}=await sb.auth.resetPasswordForEmail(mail,{redirectTo:location.origin+location.pathname});
+  acMsg(error?errAuth(error):"Si existe una cuenta con ese correo, te llegará un enlace para elegir una contraseña nueva.",!!error);
+};
+$("#acLink").onclick=async()=>{
+  const mail=$("#acMail").value.trim();
+  if(!mail){acMsg("Escribe tu correo arriba y vuelve a pulsar.",true);$("#acMail").focus();return;}
+  acMsg("Enviando…");
   const {error}=await sb.auth.signInWithOtp({email:mail,options:{emailRedirectTo:location.origin+location.pathname,shouldCreateUser:true}});
-  btn.disabled=false;
-  if(error)acMsg(error.status===429?"Demasiados intentos seguidos. Espera un poco y vuelve a probar.":"No se pudo enviar: "+error.message,true);
-  else acMsg("Listo. Abre el enlace que te hemos mandado a "+mail+" para entrar.");
+  acMsg(error?errAuth(error):"Listo. Abre el enlace que te hemos mandado a "+mail+" para entrar.",!!error);
 };
 $("#vacioAdd").onclick=()=>$("#addBtn").click();
 // enlace caducado o ya usado
