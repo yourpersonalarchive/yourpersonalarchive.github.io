@@ -112,3 +112,14 @@ body.sinpiezas #main .empty{display:none}
 .ac-caja button{height:38px;padding:0 14px;border-radius:8px;background:var(--fg);color:var(--bg);border:0;cursor:pointer}
 .ac-caja button:disabled{opacity:.5;cursor:default}
 #acMsg.err{color:var(--danger)}
+
+.e-tools{display:flex;align-items:center;gap:14px;margin-top:6px}
+.e-tools button{height:28px;padding:0 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);cursor:pointer}
+.e-rec{display:inline-flex;align-items:center;gap:6px;color:var(--muted);cursor:pointer}
+.cam{position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.88);display:grid;place-items:center;padding:16px}
+.cam-in{display:grid;gap:12px;justify-items:center;max-width:100%}
+.cam video{max-width:100%;max-height:72vh;background:#000;border-radius:6px}
+.cam-bar{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.cam-bar button{height:38px;padding:0 16px;border-radius:8px;border:1px solid #555;background:#222;color:#fff;cursor:pointer}
+.cam-bar .cam-snap{background:#fff;color:#111;border-color:#fff}
+.cam-msg{color:#fff;max-width:420px;text-align:center}
