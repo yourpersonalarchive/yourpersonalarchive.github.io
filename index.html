@@ -1378,8 +1378,8 @@ function editorHTML(e){
   const prev=i=>{const p=e.previews[i]||(e.img[i]?src(e.img[i]):null);return p?`<img src="${p}" alt="">`:`<span class="ph mono">—</span>`;};
   return `<form class="ed" id="edform" novalidate>
   <div class="mono muted">${e.isNew?"Nueva pieza":"Editar pieza"}</div><h1 id="f-title">${esc(e.titulo||"Sin título")}</h1>
-  <div class="fld"><label>Anverso${e.isNew?" (obligatorio)":""}</label><div class="drop">${prev(0)}<input type="file" id="e-f0" accept="image/*"></div><div class="e-tools mono"><button type="button" id="e-cam0">Hacer foto</button><label class="e-rec"><input type="checkbox" id="e-rec"${recOn()?" checked":""}> Recortar el fondo</label></div></div>
-  <div class="fld"><label>Reverso (opcional)</label><div class="drop">${prev(1)}<input type="file" id="e-f1" accept="image/*">${(e.img[1]||e.previews[1])?`<button type="button" class="mono muted" id="e-rm1">Quitar</button>`:""}</div><div class="e-tools mono"><button type="button" id="e-cam1">Hacer foto</button></div></div>
+  <div class="fld"><label>Anverso${e.isNew?" (obligatorio)":""}</label><div class="drop">${prev(0)}<input type="file" id="e-f0" accept="image/*"></div><div class="e-tools mono"><button type="button" id="e-cam0">Hacer foto</button><button type="button" id="e-ret0">Retocar recorte</button><label class="e-rec"><input type="checkbox" id="e-rec"${recOn()?" checked":""}> Recortar el fondo</label></div></div>
+  <div class="fld"><label>Reverso (opcional)</label><div class="drop">${prev(1)}<input type="file" id="e-f1" accept="image/*">${(e.img[1]||e.previews[1])?`<button type="button" class="mono muted" id="e-rm1">Quitar</button>`:""}</div><div class="e-tools mono"><button type="button" id="e-cam1">Hacer foto</button><button type="button" id="e-ret1">Retocar recorte</button></div></div>
   ${f("titulo","Título",e.titulo,'required')}
   <div class="row2">${f("tipo","Tipo",e.tipo,'list="dl-tipo" required')}${f("anio","Año",e.anio,'inputmode="numeric" placeholder="Sin fechar"')}</div>
   <div class="fld"><label>Ámbitos <span class="muted">· obligatorio, hasta tres · el tema, son las etiquetas del libro</span></label><input type="hidden" id="e-ambito" value="${esc(e.ambito)}"><div class="ambpick" id="e-ambpick">${ambChips(e.ambito.split(",").map(x=>x.trim()).filter(Boolean))}</div></div>
@@ -1402,10 +1402,10 @@ function wireEditor(){
   $("#e-titulo").oninput=ev=>{$("#f-title").textContent=ev.target.value||"Sin título";};
   $("#e-ancho").oninput=()=>{const a=aspect();if($("#e-lock").checked&&a&&+$("#e-ancho").value)$("#e-alto").value=Math.round(+$("#e-ancho").value*a);readForm();sizeCard();};
   $("#e-alto").oninput=()=>{const a=aspect();if($("#e-lock").checked&&a&&+$("#e-alto").value)$("#e-ancho").value=Math.round(+$("#e-alto").value/a);readForm();sizeCard();};
-  [0,1].forEach(i=>$("#e-f"+i).onchange=async ev=>{const f0=ev.target.files[0];if(!f0)return;readForm();const file=await procesarImagen(f0);readForm();e.files[i]=file;e.previews[i]=URL.createObjectURL(file);
+  [0,1].forEach(i=>$("#e-f"+i).onchange=async ev=>{const f0=ev.target.files[0];if(!f0)return;readForm();const file=await procesarImagen(f0,i);readForm();e.files[i]=file;e.previews[i]=URL.createObjectURL(file);
     if(i===0&&(!+e.ancho||!+e.alto)){const im=new Image();im.onload=()=>{if(!+e.ancho){e.ancho=Math.round(im.naturalWidth/450*25.4);e.alto=Math.round(im.naturalHeight/450*25.4);}drawFicha();};im.src=e.previews[0];}else drawFicha();});
   if($("#e-rec"))$("#e-rec").onchange=ev=>{try{localStorage.setItem("arch-rec",ev.target.checked?"1":"0");}catch(_){}};
-  [0,1].forEach(i=>{const b=$("#e-cam"+i);if(b)b.onclick=()=>abrirCamara(i);});
+  [0,1].forEach(i=>{const b=$("#e-cam"+i);if(b)b.onclick=()=>abrirCamara(i);const r=$("#e-ret"+i);if(r)r.onclick=()=>retocarRecorte(i);});
   $("#e-snd").onchange=async ev=>{const f=ev.target.files[0];ev.target.value="";if(!f)return;readForm();try{const a=await trimmer(f,e.titulo);e.sonidoFile=new File([a.blob],f.name.replace(/\.[^.]+$/,"")+(a.type==="video/webm"?".webm":".mp4"),{type:a.type});}catch(err){if(err!=="cancel")toast(typeof err==="string"?err:"No se pudo leer el audio");}drawFicha();};
   if($("#e-sndrm"))$("#e-sndrm").onclick=()=>{readForm();e.sonidoFile=null;e.sonido=null;drawFicha();};
   if($("#e-rm1")) $("#e-rm1").onclick=()=>{readForm();e.files[1]=null;e.previews[1]=null;e.img=e.img.slice(0,1);drawFicha();};
@@ -1462,11 +1462,11 @@ function newWire(){
   const e=editing;$("#f-close").onclick=closeFicha;
   const c=$("#card");const k=stageScale.call(null);
   const wd=+e.ancho||85,hd=+e.alto||55;c.style.width=wd*Math.min(k,4)+"px";c.style.height=hd*Math.min(k,4)+"px";
-  if(e.previews[0]) $("#newprev").outerHTML=`<div class="face front"><img src="${e.previews[0]}" alt="" draggable="false"></div>`;
+  if(e.previews[0]){const np=$("#newprev");if(np)np.outerHTML=`<div class="face front"><img src="${e.previews[0]}" alt="" draggable="false"></div>`;else{const im=document.querySelector("#card .face.front img");if(im)im.src=e.previews[0];}}
   $("#esc").textContent="Escala "+escalaTxt(k);
   wireEditor();
   const redraw=()=>{readForm();$("#fmeta").innerHTML=editorHTML(e);newWire();};
-  [0,1].forEach(i=>$("#e-f"+i).onchange=async ev=>{const f0=ev.target.files[0];if(!f0)return;readForm();const file=await procesarImagen(f0);readForm();e.files[i]=file;e.previews[i]=URL.createObjectURL(file);
+  [0,1].forEach(i=>$("#e-f"+i).onchange=async ev=>{const f0=ev.target.files[0];if(!f0)return;readForm();const file=await procesarImagen(f0,i);readForm();e.files[i]=file;e.previews[i]=URL.createObjectURL(file);
     if(i===0){const im=new Image();im.onload=()=>{if(!+e.ancho){e.ancho=Math.round(im.naturalWidth/450*25.4);e.alto=Math.round(im.naturalHeight/450*25.4);}$("#fmeta").innerHTML=editorHTML(e);newWire();};im.src=e.previews[0];}else redraw();});
   $("#e-cancel").onclick=()=>{editing=null;closeFicha();};
   $("#e-ancho").oninput=$("#e-alto").oninput=()=>{readForm();const k2=stageScale();c.style.width=(+e.ancho||85)*k2+"px";c.style.height=(+e.alto||55)*k2+"px";};
@@ -2364,21 +2364,50 @@ function lab(r,g,b){
 }
 const mediana=a=>{a.sort((p,q)=>p-q);return a[a.length>>1]||0;};
 
-/* Quita el fondo: mide el color del borde de la foto, lo propaga hacia dentro y deja como objeto todo lo que no es fondo.
-   Devuelve {ok,file} o {ok:false,motivo}. Funciona bien con fondos lisos (escáner, mesa, pared, papel). */
-async function recortarFondo(file){
-  const bmp=await createImageBitmap(file);
-  const k=Math.min(1,1600/Math.max(bmp.width,bmp.height)),w=Math.max(2,Math.round(bmp.width*k)),h=Math.max(2,Math.round(bmp.height*k));
+/* ---------- Máscaras: del color (fondo liso) y de la IA ---------- */
+async function cargarPix(src,max){
+  const bmp=await createImageBitmap(src);
+  const k=Math.min(1,max/Math.max(bmp.width,bmp.height)),w=Math.max(2,Math.round(bmp.width*k)),h=Math.max(2,Math.round(bmp.height*k));
   const cv=document.createElement("canvas");cv.width=w;cv.height=h;
   const cx=cv.getContext("2d",{willReadFrequently:true});cx.drawImage(bmp,0,0,w,h);
-  const id=cx.getImageData(0,0,w,h),px=id.data,N=w*h;
-  const grosor=Math.max(2,Math.round(Math.min(w,h)*.012));
+  return {w,h,cv,px:cx.getImageData(0,0,w,h).data};
+}
+/* Deja el objeto como un solo bloque: quita polvo, rellena huecos y suaviza el borde. fg: 0/1. Devuelve alfa 0..1 */
+function afinarMascara(fg,w,h){
+  const N=w*h,pila=new Int32Array(N);let sp=0;
+  const lb=new Int32Array(N),areas=[0];let nl=0;
+  for(let s=0;s<N;s++){if(!fg[s]||lb[s])continue;nl++;let a=0;sp=0;pila[sp++]=s;lb[s]=nl;
+    while(sp){const i=pila[--sp];a++;const x=i%w,y=(i/w)|0;
+      if(x>0&&fg[i-1]&&!lb[i-1]){lb[i-1]=nl;pila[sp++]=i-1;}if(x<w-1&&fg[i+1]&&!lb[i+1]){lb[i+1]=nl;pila[sp++]=i+1;}
+      if(y>0&&fg[i-w]&&!lb[i-w]){lb[i-w]=nl;pila[sp++]=i-w;}if(y<h-1&&fg[i+w]&&!lb[i+w]){lb[i+w]=nl;pila[sp++]=i+w;}}
+    areas.push(a);}
+  const mayor=Math.max(0,...areas);
+  for(let i=0;i<N;i++)if(fg[i]&&areas[lb[i]]<mayor*.04)fg[i]=0;
+  // huecos: lo que no está conectado con el borde y no es objeto, es objeto
+  const bg=new Uint8Array(N);sp=0;
+  const mete=i=>{if(!fg[i]&&!bg[i]){bg[i]=1;pila[sp++]=i;}};
+  for(let x=0;x<w;x++){mete(x);mete((h-1)*w+x);}for(let y=0;y<h;y++){mete(y*w);mete(y*w+w-1);}
+  while(sp){const i=pila[--sp],x=i%w,y=(i/w)|0;if(x>0)mete(i-1);if(x<w-1)mete(i+1);if(y>0)mete(i-w);if(y<h-1)mete(i+w);}
+  const f2=new Uint8Array(N);for(let i=0;i<N;i++)f2[i]=bg[i]?0:1;
+  // se aprieta un píxel para quitar el halo y se suaviza
+  const er=new Uint8Array(N);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;
+    er[i]=f2[i]&&(x>0?f2[i-1]:0)&&(x<w-1?f2[i+1]:0)&&(y>0?f2[i-w]:0)&&(y<h-1?f2[i+w]:0)?1:0;}
+  const al=new Float32Array(N);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){let s=0,c=0;
+    for(let dy=-1;dy<=1;dy++){const yy=y+dy;if(yy<0||yy>=h)continue;for(let dx=-1;dx<=1;dx++){const xx=x+dx;if(xx<0||xx>=w)continue;s+=er[yy*w+xx];c++;}}
+    const v=s/c,t=Math.max(0,Math.min(1,(v-.2)/.6));al[y*w+x]=t*t*(3-2*t);}
+  return al;
+}
+function fraccion(al){let c=0;for(let i=0;i<al.length;i++)if(al[i]>.5)c++;return c/al.length;}
+
+/* Fondo liso: mide el color del borde, lo propaga hacia dentro y deja como objeto todo lo demás. */
+function mascaraColor(px,w,h){
+  const N=w*h,grosor=Math.max(2,Math.round(Math.min(w,h)*.012));
   const enBorde=(x,y)=>x<grosor||y<grosor||x>=w-grosor||y>=h-grosor;
-  // ¿ya viene con fondo transparente?
   let transp=0,nb=0;
   for(let y=0;y<h;y++)for(let x=0;x<w;x++){if(!enBorde(x,y))continue;nb++;if(px[(y*w+x)*4+3]<128)transp++;}
   if(transp/nb>.5)return {ok:false,motivo:"La imagen ya tiene el fondo transparente"};
-  // color del fondo: mediana de los píxeles del borde
   const L=new Float32Array(N),A=new Float32Array(N),B=new Float32Array(N);
   for(let i=0;i<N;i++){const c=lab(px[i*4],px[i*4+1],px[i*4+2]);L[i]=c[0];A[i]=c[1];B[i]=c[2];}
   const sL=[],sA=[],sB=[],paso=Math.max(1,Math.floor(nb/4000));let n=0;
@@ -2388,57 +2417,187 @@ async function recortarFondo(file){
   const ds=[];for(let j=0;j<sL.length;j++){const dl=(sL[j]-bL)*.55,da=sA[j]-bA,db=sB[j]-bB;ds.push(Math.sqrt(dl*dl+da*da+db*db));}
   const mdn=mediana(ds.slice()),ruido=mediana(ds.map(d=>Math.abs(d-mdn)));
   const tol=Math.max(11,Math.min(36,9+4*ruido));
-  // fondo = lo parecido al color del borde y conectado con él
   const fondo=new Uint8Array(N),pila=new Int32Array(N);let sp=0;
   const mete=i=>{if(!fondo[i]&&dist(i)<=tol){fondo[i]=1;pila[sp++]=i;}};
   for(let x=0;x<w;x++){mete(x);mete((h-1)*w+x);}for(let y=0;y<h;y++){mete(y*w);mete(y*w+w-1);}
   while(sp){const i=pila[--sp],x=i%w,y=(i/w)|0;if(x>0)mete(i-1);if(x<w-1)mete(i+1);if(y>0)mete(i-w);if(y<h-1)mete(i+w);}
-  // objeto = lo demás; se quedan los trozos grandes y se descartan motas y polvo
-  let fg=new Uint8Array(N);for(let i=0;i<N;i++)fg[i]=fondo[i]?0:1;
-  const lab_=new Int32Array(N),areas=[0];let nl=0;
-  for(let s=0;s<N;s++){if(!fg[s]||lab_[s])continue;nl++;let a=0;sp=0;pila[sp++]=s;lab_[s]=nl;
-    while(sp){const i=pila[--sp];a++;const x=i%w,y=(i/w)|0;
-      if(x>0&&fg[i-1]&&!lab_[i-1]){lab_[i-1]=nl;pila[sp++]=i-1;}if(x<w-1&&fg[i+1]&&!lab_[i+1]){lab_[i+1]=nl;pila[sp++]=i+1;}
-      if(y>0&&fg[i-w]&&!lab_[i-w]){lab_[i-w]=nl;pila[sp++]=i-w;}if(y<h-1&&fg[i+w]&&!lab_[i+w]){lab_[i+w]=nl;pila[sp++]=i+w;}}
-    areas.push(a);}
-  const mayor=Math.max(0,...areas);
-  if(!mayor)return {ok:false,motivo:"No encuentro el objeto: el fondo y el objeto son del mismo color"};
-  let cuenta=0;for(let i=0;i<N;i++){if(fg[i]&&areas[lab_[i]]<mayor*.04)fg[i]=0;if(fg[i])cuenta++;}
-  const frac=cuenta/N;
-  if(frac<.01)return {ok:false,motivo:"No encuentro el objeto: el fondo y el objeto son del mismo color"};
-  if(frac>.93)return {ok:false,motivo:"No distingo el fondo del objeto; se usa la imagen completa"};
-  // borde: se aprieta un píxel para quitar el halo del fondo y se suaviza
-  const er=new Uint8Array(N);
-  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;
-    er[i]=fg[i]&&(x>0?fg[i-1]:0)&&(x<w-1?fg[i+1]:0)&&(y>0?fg[i-w]:0)&&(y<h-1?fg[i+w]:0)?1:0;}
-  const al=new Float32Array(N);
-  for(let y=0;y<h;y++)for(let x=0;x<w;x++){let s=0,c=0;
-    for(let dy=-1;dy<=1;dy++){const yy=y+dy;if(yy<0||yy>=h)continue;for(let dx=-1;dx<=1;dx++){const xx=x+dx;if(xx<0||xx>=w)continue;s+=er[yy*w+xx];c++;}}
-    const v=s/c,t=Math.max(0,Math.min(1,(v-.2)/.6));al[y*w+x]=t*t*(3-2*t);}
-  // recorte a la caja del objeto
+  const fg=new Uint8Array(N);for(let i=0;i<N;i++)fg[i]=fondo[i]?0:1;
+  const al=afinarMascara(fg,w,h),fr=fraccion(al);
+  if(fr<.01)return {ok:false,motivo:"No encuentro el objeto: el fondo y el objeto son del mismo color"};
+  if(fr>.93)return {ok:false,motivo:"No distingo el fondo del objeto"};
+  return {ok:true,al};
+}
+
+/* IA (ormbg, Apache-2.0), en el propio navegador. Se descarga la primera vez que se usa (~45 MB) y queda en caché. */
+let IAP=null;
+function cargarIA(){
+  if(!IAP)IAP=(async()=>{
+    const T=await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3");
+    return await T.pipeline("background-removal","onnx-community/ormbg-ONNX",{dtype:"q8",device:"wasm"});
+  })().catch(e=>{IAP=null;throw e;});
+  return IAP;
+}
+async function mascaraIA(cv,w,h){
+  const seg=await cargarIA();
+  const b=await new Promise(r=>cv.toBlob(r,"image/jpeg",.92)),url=URL.createObjectURL(b);
+  let res;try{res=await seg(url);}finally{URL.revokeObjectURL(url);}
+  const r0=Array.isArray(res)?res[0]:res,c2=document.createElement("canvas");c2.width=w;c2.height=h;
+  const x2=c2.getContext("2d",{willReadFrequently:true});x2.drawImage(r0.toCanvas(),0,0,w,h);
+  const d=x2.getImageData(0,0,w,h).data,fg=new Uint8Array(w*h);
+  for(let i=0;i<w*h;i++)fg[i]=d[i*4+3]>=70?1:0;
+  const al=afinarMascara(fg,w,h),fr=fraccion(al);
+  if(fr<.01)return {ok:false,motivo:"La IA no encuentra ningún objeto"};
+  return {ok:true,al};
+}
+
+/* Guarda el objeto con su máscara, recortado a su caja */
+async function exportarRecorte(px,w,h,al,nombre){
   let x0=w,y0=h,x1=-1,y1=-1;
   for(let y=0;y<h;y++)for(let x=0;x<w;x++){if(al[y*w+x]>.02){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;}}
+  if(x1<0)return null;
   const m=Math.max(1,Math.round(Math.min(w,h)*.004));x0=Math.max(0,x0-m);y0=Math.max(0,y0-m);x1=Math.min(w-1,x1+m);y1=Math.min(h-1,y1+m);
-  const cw=x1-x0+1,ch=y1-y0+1;
-  const out=document.createElement("canvas");out.width=cw;out.height=ch;
+  const cw=x1-x0+1,ch=y1-y0+1,out=document.createElement("canvas");out.width=cw;out.height=ch;
   const oc=out.getContext("2d"),od=oc.createImageData(cw,ch);
   for(let y=0;y<ch;y++)for(let x=0;x<cw;x++){const si=(y+y0)*w+(x+x0),o=(y*cw+x)*4;od.data[o]=px[si*4];od.data[o+1]=px[si*4+1];od.data[o+2]=px[si*4+2];od.data[o+3]=Math.round(al[si]*px[si*4+3]);}
   oc.putImageData(od,0,0);
   const blob=await new Promise(r=>out.toBlob(r,"image/webp",.92));
-  if(!blob)return {ok:false,motivo:"No se pudo generar la imagen recortada"};
-  return {ok:true,w:cw,h:ch,file:new File([blob],(file.name||"foto").replace(/\.[^.]+$/,"")+"-recorte.webp",{type:"image/webp"})};
+  if(!blob)return null;
+  return {w:cw,h:ch,file:new File([blob],(nombre||"foto").replace(/\.[^.]+$/,"")+"-recorte.webp",{type:"image/webp"})};
+}
+
+/* Recorte automático: primero por color (rápido y fiel en papeles, entradas, pegatinas sobre fondo liso); si no basta, con IA. */
+async function recortarFondo(file,conIA){
+  const p=await cargarPix(file,1600);
+  let m=conIA?{ok:false}:mascaraColor(p.px,p.w,p.h);
+  if(!m.ok&&m.motivo==="La imagen ya tiene el fondo transparente")return m;
+  if(!m.ok){
+    try{toast("Probando con IA (la primera vez tarda un poco)…");m=await mascaraIA(p.cv,p.w,p.h);}catch(e){m={ok:false,motivo:(m&&m.motivo)||"No se pudo recortar el fondo"};}
+  }
+  if(!m.ok)return {ok:false,motivo:m.motivo||"No se pudo recortar el fondo"};
+  const r=await exportarRecorte(p.px,p.w,p.h,m.al,file.name);
+  if(!r)return {ok:false,motivo:"No se pudo generar la imagen recortada"};
+  return {ok:true,w:r.w,h:r.h,file:r.file};
 }
 
 /* Paso común al elegir una imagen (del dispositivo o de la cámara) */
-async function procesarImagen(file){
-  if(!recOn())return file;
+const ORIG=[null,null];   // por cara: {orig: foto sin recortar, res: lo que se guardó}
+async function procesarImagen(file,i){
+  const inp=i!=null?$("#e-f"+i):null;
+  const fija=out=>{if(i!=null&&ORIG[i])ORIG[i].res=out;return out;};
+  if(inp&&inp.dataset.noRec){delete inp.dataset.noRec;return fija(file);}   // viene del editor de retoque: ya está recortada
+  if(i!=null)ORIG[i]={orig:file,res:null};
+  if(!recOn())return fija(file);
   try{
     toast("Recortando el fondo…");
     const r=await recortarFondo(file);
-    if(r.ok){toast("Fondo recortado");return r.file;}
+    if(r.ok){toast("Fondo recortado. Puedes retocarlo con «Retocar recorte»");return fija(r.file);}
     toast(r.motivo);
   }catch(err){toast("No se pudo abrir esa imagen para recortarla; se usa tal cual");}
-  return file;
+  return fija(file);
+}
+
+/* ---------- Editor de retoque: borrar, recuperar, varita y recorte automático ---------- */
+async function retocarRecorte(i){
+  const inp=$("#e-f"+i);if(!inp)return;
+  const ed=(typeof editing!=="undefined"&&editing)||null;
+  const o=ORIG[i];let tieneOrig=!!(o&&ed&&ed.files&&ed.files[i]===o.res),origen=tieneOrig?o.orig:null;
+  if(!origen&&ed)origen=ed.files&&ed.files[i]||ed.previews&&ed.previews[i]||(ed.img&&ed.img[i]?src(ed.img[i]):null);
+  if(!origen){toast("Elige primero una imagen");return;}
+  let blob=origen;
+  if(typeof origen==="string"){try{blob=await fetch(origen).then(r=>r.blob());}catch(e){toast("No se pudo abrir la imagen");return;}}
+  let P;try{P=await cargarPix(blob,1600);}catch(e){toast("No se pudo abrir la imagen");return;}
+  const {w,h,px}=P,N=w*h,mask=new Uint8Array(N);
+  const rgba=new Uint8ClampedArray(px);                        // lo que se ve (alfa = máscara + sombra del borrado)
+  const deshacer=[];let tool=tieneOrig?"borrar":"borrar",radio=30,tol=24,sucio=false;
+  // máscara inicial: la de la imagen (si ya venía recortada) o la automática
+  if(!tieneOrig){for(let k=0;k<N;k++)mask[k]=px[k*4+3];}
+  else{const m=mascaraColor(px,w,h);if(m.ok)for(let k=0;k<N;k++)mask[k]=Math.round(m.al[k]*255);else mask.fill(255);}
+  const ghost=tieneOrig?.22:0;
+  const pintaTodo=()=>{for(let k=0;k<N;k++){const m=mask[k];rgba[k*4+3]=Math.round(m+(255-m)*ghost*(px[k*4+3]/255));}};
+  const m=document.createElement("div");m.className="ret";m.setAttribute("role","dialog");m.setAttribute("aria-label","Retocar recorte");
+  m.innerHTML='<div class="ret-in"><div class="ret-lienzo"><canvas></canvas></div>'
+    +'<div class="ret-bar mono"><div class="ret-fila" role="group" aria-label="Herramienta">'
+    +'<button type="button" data-t="borrar" aria-pressed="true">Borrar</button>'
+    +'<button type="button" data-t="recuperar" aria-pressed="false"'+(tieneOrig?"":" disabled title=\"Solo disponible con la foto original\"")+'>Recuperar</button>'
+    +'<button type="button" data-t="varita" aria-pressed="false">Varita: borrar zona</button>'
+    +'<button type="button" data-t="varitaR" aria-pressed="false"'+(tieneOrig?"":" disabled")+'>Varita: recuperar zona</button></div>'
+    +'<div class="ret-fila"><label>Pincel <input type="range" id="ret-r" min="4" max="160" value="30"></label><label>Tolerancia <input type="range" id="ret-t" min="4" max="80" value="24"></label></div>'
+    +'<div class="ret-fila"><button type="button" data-a="auto"'+(tieneOrig?"":" disabled")+'>Recorte automático</button><button type="button" data-a="ia"'+(tieneOrig?"":" disabled")+'>Recorte con IA</button><button type="button" data-a="todo"'+(tieneOrig?"":" disabled")+'>Sin recorte</button><button type="button" data-a="undo">Deshacer</button></div>'
+    +'<div class="ret-fila ret-fin"><button type="button" data-a="cancel">Cancelar</button><button type="button" data-a="ok" class="sello">Aplicar</button></div>'
+    +'<p class="muted ret-ayuda">Arrastra sobre la imagen. Lo borrado se ve en tono claro para que puedas recuperarlo.</p></div></div>';
+  document.body.appendChild(m);
+  const cv=m.querySelector("canvas");cv.width=w;cv.height=h;const cx=cv.getContext("2d");
+  const img=new ImageData(rgba,w,h);
+  const dibuja=(x0,y0,x1,y1)=>{if(x0==null){cx.putImageData(img,0,0);return;}cx.putImageData(img,0,0,x0,y0,x1-x0,y1-y0);};
+  const guarda=()=>{deshacer.push(mask.slice());if(deshacer.length>15)deshacer.shift();};
+  const cerrar=()=>{document.removeEventListener("keydown",tecla,true);m.remove();};
+  const tecla=ev=>{if(ev.key==="Escape"){ev.stopPropagation();cerrar();}else if((ev.metaKey||ev.ctrlKey)&&ev.key==="z"){ev.preventDefault();des();}};
+  document.addEventListener("keydown",tecla,true);
+  const des=()=>{const u=deshacer.pop();if(!u)return;mask.set(u);pintaTodo();dibuja();};
+  pintaTodo();dibuja();
+  const setTool=t=>{tool=t;m.querySelectorAll("[data-t]").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.t===t)));cv.style.cursor=t==="borrar"||t==="recuperar"?"crosshair":"cell";};
+  // pincel
+  const aPix=ev=>{const r=cv.getBoundingClientRect();return [(ev.clientX-r.left)*w/r.width,(ev.clientY-r.top)*h/r.height,w/r.width];};
+  const sello=(cxp,cyp,r,borra)=>{
+    const x0=Math.max(0,Math.floor(cxp-r)),x1=Math.min(w,Math.ceil(cxp+r)+1),y0=Math.max(0,Math.floor(cyp-r)),y1=Math.min(h,Math.ceil(cyp+r)+1);
+    for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++){
+      const d=Math.hypot(x-cxp,y-cyp);if(d>r)continue;
+      const c=d<=r*.75?1:(r-d)/(r*.25),k=y*w+x;
+      if(borra){const v=Math.round(mask[k]*(1-c));if(v<mask[k])mask[k]=v;}else{const v=Math.round(255*c);if(v>mask[k])mask[k]=v;}
+      const mm=mask[k];rgba[k*4+3]=Math.round(mm+(255-mm)*ghost*(px[k*4+3]/255));}
+    return [x0,y0,x1,y1];
+  };
+  let pintando=false,ult=null;
+  const trazo=ev=>{
+    const [x,y,esc]=aPix(ev),r=radio*esc/2,borra=tool==="borrar";
+    let bx0=w,by0=h,bx1=0,by1=0;const un=(b)=>{bx0=Math.min(bx0,b[0]);by0=Math.min(by0,b[1]);bx1=Math.max(bx1,b[2]);by1=Math.max(by1,b[3]);};
+    if(ult){const dx=x-ult[0],dy=y-ult[1],n=Math.max(1,Math.ceil(Math.hypot(dx,dy)/Math.max(1,r/3)));for(let s=1;s<=n;s++)un(sello(ult[0]+dx*s/n,ult[1]+dy*s/n,r,borra));}
+    else un(sello(x,y,r,borra));
+    ult=[x,y];dibuja(bx0,by0,bx1,by1);
+  };
+  // varita: zona contigua de color parecido
+  let LAB=null;
+  const labs=()=>{if(LAB)return LAB;LAB=new Float32Array(N*3);for(let k=0;k<N;k++){const c=lab(px[k*4],px[k*4+1],px[k*4+2]);LAB[k*3]=c[0];LAB[k*3+1]=c[1];LAB[k*3+2]=c[2];}return LAB;};
+  const varita=(ev,borra)=>{
+    const [x,y]=aPix(ev),sx=Math.max(0,Math.min(w-1,Math.round(x))),sy=Math.max(0,Math.min(h-1,Math.round(y)));
+    const L=labs(),s=sy*w+sx,tl=L[s*3],ta=L[s*3+1],tb=L[s*3+2],lim=tol,vis=new Uint8Array(N),pila=new Int32Array(N);let sp=0;
+    const ok=k=>{const dl=(L[k*3]-tl)*.7,da=L[k*3+1]-ta,db=L[k*3+2]-tb;return Math.sqrt(dl*dl+da*da+db*db)<=lim;};
+    guarda();vis[s]=1;pila[sp++]=s;
+    while(sp){const k=pila[--sp],xx=k%w,yy=(k/w)|0;
+      for(const nb of [xx>0?k-1:-1,xx<w-1?k+1:-1,yy>0?k-w:-1,yy<h-1?k+w:-1]){if(nb<0||vis[nb])continue;vis[nb]=1;if(ok(nb))pila[sp++]=nb;}
+      mask[k]=borra?0:255;}
+    pintaTodo();dibuja();
+  };
+  cv.addEventListener("pointerdown",ev=>{
+    ev.preventDefault();
+    if(tool==="varita")return varita(ev,true);if(tool==="varitaR")return varita(ev,false);
+    guarda();pintando=true;ult=null;cv.setPointerCapture(ev.pointerId);trazo(ev);});
+  cv.addEventListener("pointermove",ev=>{if(pintando)trazo(ev);});
+  const fin=()=>{pintando=false;ult=null;};cv.addEventListener("pointerup",fin);cv.addEventListener("pointercancel",fin);
+  m.querySelector("#ret-r").oninput=ev=>{radio=+ev.target.value;};
+  m.querySelector("#ret-t").oninput=ev=>{tol=+ev.target.value;};
+  const aplica=async(fn,msg)=>{toast(msg);try{const r=await fn();if(!r.ok){toast(r.motivo);return;}guarda();for(let k=0;k<N;k++)mask[k]=Math.round(r.al[k]*255);pintaTodo();dibuja();}catch(e){toast("No se pudo: "+(e&&e.message||e));}};
+  m.onclick=async ev=>{
+    const t=ev.target.closest("[data-t]"),a=ev.target.closest("[data-a]");
+    if(t&&!t.disabled){setTool(t.dataset.t);return;}
+    if(ev.target===m){return;}
+    if(!a||a.disabled)return;
+    const q=a.dataset.a;
+    if(q==="cancel")cerrar();
+    else if(q==="undo")des();
+    else if(q==="todo"){guarda();mask.fill(255);pintaTodo();dibuja();}
+    else if(q==="auto")await aplica(async()=>mascaraColor(px,w,h),"Recortando…");
+    else if(q==="ia")await aplica(()=>mascaraIA(P.cv,w,h),"Recortando con IA (la primera vez tarda un poco)…");
+    else if(q==="ok"){
+      const al=new Float32Array(N);for(let k=0;k<N;k++)al[k]=mask[k]/255;
+      const r=await exportarRecorte(px,w,h,al,(blob.name||"foto"));
+      if(!r){toast("No queda nada: la imagen está totalmente borrada");return;}
+      cerrar();
+      const dt=new DataTransfer();dt.items.add(r.file);inp.files=dt.files;inp.dataset.noRec="1";
+      inp.dispatchEvent(new Event("change",{bubbles:true}));
+    }
+  };
+  setTool("borrar");
 }
 
 /* Cámara: foto directa desde el dispositivo hacia el anverso o el reverso */
