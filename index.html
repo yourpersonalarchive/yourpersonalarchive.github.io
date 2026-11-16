@@ -2701,10 +2701,11 @@ const DET_TIPOS=[
 ["Llavero","a keychain"],
 ["Chapa","a small round pin badge"],
 ["Muñeco","a toy figure or plush"],
+["Juguete","a plastic construction toy or LEGO building blocks set"],
 ["Mapa","a folded city map"],
 ["Pasaporte","a passport booklet"]];
 /* Palabras en el propio objeto que fijan el tipo por encima del modelo */
-const DET_KW=[[/\b(entrada|ticket|admission|admit|eintritt|biglietto)\b/,"Entrada"],[/\b(boarding|renfe|metro|embarque|coach|anden|vuelo|flight)\b/,"Billete"],[/\b(postal|postcard|carte postale)\b/,"Postal"],[/\b(passport|pasaporte|reisepass)\b/,"Pasaporte"]];
+const DET_KW=[[/\b(entrada|ticket|admission|admit|eintritt|biglietto)\b/,"Entrada"],[/\b(boarding|renfe|metro|embarque|coach|anden|vuelo|flight)\b/,"Billete"],[/\b(lego|playmobil)\b/,"Juguete"],[/\b(postal|postcard|carte postale)\b/,"Postal"],[/\b(passport|pasaporte|reisepass)\b/,"Pasaporte"]];
 const DET_RUIDO=/^(entrada|entradas|ticket|tickets|admit|admission|general|adulto|adult|precio|price|total|iva|vat|fecha|date|hora|fila|asiento|seat|row|puerta|gate|zona|sala|nº|no\.|ref|www\.|http)/i;
 function detLineas(data){
   const ls=[];
@@ -2750,7 +2751,7 @@ async function detectarDatos(file,manual){
   // ámbitos: pistas en el texto + lo que implica el tipo
   const amb=new Set();
   if(typeof AMB_HINTS!=="undefined")AMB_HINTS.forEach(([re,a])=>{if(re.test(foldT))amb.add(a);});
-  const porTipo={Vinilo:"Música",CD:"Música",Casete:"Música",Bufanda:"Deporte",Billete:"Viajes",Pasaporte:"Viajes",Mapa:"Viajes",Libro:"Literatura",Revista:"Literatura",Marcapáginas:"Literatura"};
+  const porTipo={Vinilo:"Música",CD:"Música",Casete:"Música",Bufanda:"Deporte",Billete:"Viajes",Pasaporte:"Viajes",Mapa:"Viajes",Libro:"Literatura",Revista:"Literatura",Marcapáginas:"Literatura",Juguete:"Ocio",Muñeco:"Ocio"};
   if(tipo&&porTipo[tipo])amb.add(porTipo[tipo]);
   if(amb.size)sug.ambitos=[...amb].slice(0,3);
   // año
