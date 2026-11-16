@@ -614,7 +614,7 @@ details.blk:not([open]),#d-sel details.sec:not([open]){padding-bottom:0!importan
 @media (max-width:860px){.formas{display:none}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
-<link rel="stylesheet" href="editorial.css">
+<link rel="stylesheet" href="editorial.css?v=7">
 
 <nav class="corner views" aria-label="Vistas">
   <button data-view="galeria">Galería</button>
@@ -2525,8 +2525,12 @@ async function retocarRecorte(i){
     +'<div class="ret-fila"><button type="button" data-a="auto"'+(tieneOrig?"":" disabled")+'>Recorte automático</button><button type="button" data-a="ia"'+(tieneOrig?"":" disabled")+'>Recorte con IA</button><button type="button" data-a="todo"'+(tieneOrig?"":" disabled")+'>Sin recorte</button><button type="button" data-a="undo">Deshacer</button></div>'
     +'<div class="ret-fila ret-fin"><button type="button" data-a="cancel">Cancelar</button><button type="button" data-a="ok" class="sello">Aplicar</button></div>'
     +'<p class="muted ret-ayuda">Arrastra sobre la imagen. Lo borrado se ve en tono claro para que puedas recuperarlo.</p></div></div>';
+  // estilos esenciales en línea: el editor se ve bien aunque el CSS aún esté en caché
+  m.style.cssText="position:fixed;inset:0;z-index:410;background:rgba(20,20,20,.92);display:grid;place-items:center;padding:12px";
   document.body.appendChild(m);
   const cv=m.querySelector("canvas");cv.width=w;cv.height=h;const cx=cv.getContext("2d");
+  cv.style.cssText="max-width:100%;max-height:calc(100vh - 210px);touch-action:none";
+  m.querySelector(".ret-bar").style.background="var(--bg,#fff)";
   const img=new ImageData(rgba,w,h);
   const dibuja=(x0,y0,x1,y1)=>{if(x0==null){cx.putImageData(img,0,0);return;}cx.putImageData(img,0,0,x0,y0,x1-x0,y1-y0);};
   const guarda=()=>{deshacer.push(mask.slice());if(deshacer.length>15)deshacer.shift();};
