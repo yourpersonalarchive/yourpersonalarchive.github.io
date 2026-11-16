@@ -112,6 +112,16 @@ body.sinpiezas #main .empty{display:none}
 .ac-caja button{height:38px;padding:0 14px;border-radius:8px;background:var(--fg);color:var(--bg);border:0;cursor:pointer}
 .ac-caja button:disabled{opacity:.5;cursor:default}
 #acMsg.err{color:var(--danger)}
+.ac-f{display:grid;gap:6px}
+#acForm{display:grid;gap:14px}
+#acMsg:empty{display:none}
+#acMsg{margin:0}
+.ac-tabs{display:flex;gap:6px}
+.ac-caja .ac-tabs button{flex:1;background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+.ac-caja .ac-tabs button[aria-pressed=true]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+#acBtn{width:100%}
+.ac-links{display:flex;gap:8px;flex-wrap:wrap;margin:0;color:var(--muted)}
+.ac-caja .ac-links button{height:auto;padding:0;background:none;color:var(--muted);text-decoration:underline}
 
 .e-tools{display:flex;align-items:center;gap:14px;margin-top:6px}
 .e-tools button{height:28px;padding:0 10px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);cursor:pointer}
