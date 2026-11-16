@@ -716,7 +716,7 @@ details.blk:not([open]),#d-sel details.sec:not([open]){padding-bottom:0!importan
   <form id="acForm">
     <div class="ac-tabs"><button type="button" id="acTabIn" aria-pressed="true">Entrar</button><button type="button" id="acTabUp" aria-pressed="false">Crear cuenta</button></div>
     <div class="ac-fila ac-f" id="acFMail"><label class="lbl" for="acMail">Tu correo</label><input id="acMail" type="email" required autocomplete="email" placeholder="tu@correo.com"></div>
-    <div class="ac-fila ac-f" id="acFPass"><label class="lbl" for="acPass" id="acLPass">Contraseña</label><input id="acPass" type="password" required autocomplete="current-password" placeholder="Mínimo 8 caracteres"></div>
+    <div class="ac-fila ac-f" id="acFPass"><div class="ac-lrow"><label class="lbl" for="acPass" id="acLPass">Contraseña</label><button type="button" id="acVer" aria-pressed="false">Mostrar</button></div><input id="acPass" type="password" required autocomplete="current-password" placeholder="Mínimo 8 caracteres"></div>
     <div class="ac-pie">
       <p class="mono muted" id="acMsg"></p>
       <div class="ac-pie-fila"><p class="mono ac-links"><button type="button" id="acOlvido">He olvidado la contraseña</button><button type="button" id="acLink">Entrar con un enlace al correo</button></p><button id="acBtn" class="sello">Entrar</button></div>
@@ -2299,6 +2299,7 @@ $("#loginBtn").onclick=()=>{
   if(UID){if(pendiente()){estado("Espera a que se guarde antes de salir","err");return;}sb.auth.signOut();}
   else mostrarAcceso();
 };
+$("#acVer").onclick=()=>{const p=$("#acPass"),v=p.type==="password";p.type=v?"text":"password";$("#acVer").textContent=v?"Ocultar":"Mostrar";$("#acVer").setAttribute("aria-pressed",String(v));};
 $("#acTabIn").onclick=()=>acModoSet("in");
 $("#acTabUp").onclick=()=>acModoSet("up");
 $("#acForm").onsubmit=async e=>{
