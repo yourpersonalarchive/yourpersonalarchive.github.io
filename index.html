@@ -1265,8 +1265,8 @@ function stageScale(){
   const st=$("#ficha .stage-in"); if(!st) return 1;
   const bw=st.clientWidth*.86, bh=st.clientHeight*.86;
   if(fScale==="real") return 96/25.4;
-  if(fScale==="ajustar"){const d=cur();return Math.min(bw/W(d),bh/H(d));}
-  const maxW=Math.max(...D.map(W)),maxH=Math.max(...D.map(H));
+  if(fScale==="ajustar"){const d=cur()||{ancho:+(editing&&editing.ancho)||85,alto:+(editing&&editing.alto)||55};return Math.min(bw/W(d),bh/H(d));}
+  const maxW=D.length?Math.max(...D.map(W)):85,maxH=D.length?Math.max(...D.map(H)):55;
   return Math.min(bw/maxW,bh/maxH);
 }
 function escalaTxt(k){const r=(96/25.4)/k;return Math.abs(r-1)<.05?"1:1":r>1?`1:${r.toFixed(1).replace(".",",")}`:`${(1/r).toFixed(1).replace(".",",")}:1`;}
@@ -1373,8 +1373,8 @@ function editorHTML(e){
   const prev=i=>{const p=e.previews[i]||(e.img[i]?src(e.img[i]):null);return p?`<img src="${p}" alt="">`:`<span class="ph mono">—</span>`;};
   return `<form class="ed" id="edform" novalidate>
   <div class="mono muted">${e.isNew?"Nueva pieza":"Editar pieza"}</div><h1 id="f-title">${esc(e.titulo||"Sin título")}</h1>
-  <div class="fld"><label>Anverso${e.isNew?" (obligatorio)":""}</label><div class="drop">${prev(0)}<input type="file" id="e-f0" accept="image/*"></div></div>
-  <div class="fld"><label>Reverso (opcional)</label><div class="drop">${prev(1)}<input type="file" id="e-f1" accept="image/*">${(e.img[1]||e.previews[1])?`<button type="button" class="mono muted" id="e-rm1">Quitar</button>`:""}</div></div>
+  <div class="fld"><label>Anverso${e.isNew?" (obligatorio)":""}</label><div class="drop">${prev(0)}<input type="file" id="e-f0" accept="image/*"></div><div class="e-tools mono"><button type="button" id="e-cam0">Hacer foto</button><label class="e-rec"><input type="checkbox" id="e-rec"${recOn()?" checked":""}> Recortar el fondo</label></div></div>
+  <div class="fld"><label>Reverso (opcional)</label><div class="drop">${prev(1)}<input type="file" id="e-f1" accept="image/*">${(e.img[1]||e.previews[1])?`<button type="button" class="mono muted" id="e-rm1">Quitar</button>`:""}</div><div class="e-tools mono"><button type="button" id="e-cam1">Hacer foto</button></div></div>
   ${f("titulo","Título",e.titulo,'required')}
   <div class="row2">${f("tipo","Tipo",e.tipo,'list="dl-tipo" required')}${f("anio","Año",e.anio,'inputmode="numeric" placeholder="Sin fechar"')}</div>
   <div class="fld"><label>Ámbitos <span class="muted">· obligatorio, hasta tres · el tema, son las etiquetas del libro</span></label><input type="hidden" id="e-ambito" value="${esc(e.ambito)}"><div class="ambpick" id="e-ambpick">${ambChips(e.ambito.split(",").map(x=>x.trim()).filter(Boolean))}</div></div>
@@ -1397,8 +1397,10 @@ function wireEditor(){
   $("#e-titulo").oninput=ev=>{$("#f-title").textContent=ev.target.value||"Sin título";};
   $("#e-ancho").oninput=()=>{const a=aspect();if($("#e-lock").checked&&a&&+$("#e-ancho").value)$("#e-alto").value=Math.round(+$("#e-ancho").value*a);readForm();sizeCard();};
   $("#e-alto").oninput=()=>{const a=aspect();if($("#e-lock").checked&&a&&+$("#e-alto").value)$("#e-ancho").value=Math.round(+$("#e-alto").value/a);readForm();sizeCard();};
-  [0,1].forEach(i=>$("#e-f"+i).onchange=async ev=>{const file=ev.target.files[0];if(!file)return;readForm();e.files[i]=file;e.previews[i]=URL.createObjectURL(file);
+  [0,1].forEach(i=>$("#e-f"+i).onchange=async ev=>{const f0=ev.target.files[0];if(!f0)return;readForm();const file=await procesarImagen(f0);readForm();e.files[i]=file;e.previews[i]=URL.createObjectURL(file);
     if(i===0&&(!+e.ancho||!+e.alto)){const im=new Image();im.onload=()=>{if(!+e.ancho){e.ancho=Math.round(im.naturalWidth/450*25.4);e.alto=Math.round(im.naturalHeight/450*25.4);}drawFicha();};im.src=e.previews[0];}else drawFicha();});
+  if($("#e-rec"))$("#e-rec").onchange=ev=>{try{localStorage.setItem("arch-rec",ev.target.checked?"1":"0");}catch(_){}};
+  [0,1].forEach(i=>{const b=$("#e-cam"+i);if(b)b.onclick=()=>abrirCamara(i);});
   $("#e-snd").onchange=async ev=>{const f=ev.target.files[0];ev.target.value="";if(!f)return;readForm();try{const a=await trimmer(f,e.titulo);e.sonidoFile=new File([a.blob],f.name.replace(/\.[^.]+$/,"")+(a.type==="video/webm"?".webm":".mp4"),{type:a.type});}catch(err){if(err!=="cancel")toast(typeof err==="string"?err:"No se pudo leer el audio");}drawFicha();};
   if($("#e-sndrm"))$("#e-sndrm").onclick=()=>{readForm();e.sonidoFile=null;e.sonido=null;drawFicha();};
   if($("#e-rm1")) $("#e-rm1").onclick=()=>{readForm();e.files[1]=null;e.previews[1]=null;e.img=e.img.slice(0,1);drawFicha();};
@@ -1410,7 +1412,7 @@ function wireEditor(){
   $("#e-procpick").querySelectorAll(".achip").forEach(b=>b.onclick=ev=>{ev.preventDefault();const on=$("#e-procedencia").value===b.dataset.p;$("#e-procedencia").value=on?"":b.dataset.p;$("#e-procpick").querySelectorAll(".achip").forEach(x=>x.setAttribute("aria-pressed",String(!on&&x===b)));$("#e-procedencia_de").placeholder=PROC_DE[on?"":b.dataset.p]||"De quién o dónde (opcional)";});
   wireChips($("#e-ambpick"),()=>$("#e-ambito").value.split(",").map(x=>x.trim()).filter(Boolean),v=>{$("#e-ambito").value=v.join(", ");});
 }
-function showErr(err){const p=$("#e-err");p.hidden=false;p.textContent=typeof err==="string"?err:"No se pudo guardar ("+(err&&err.code||"error")+"). Revisa la conexión y vuelve a intentarlo.";}
+function showErr(err){const p=$("#e-err");p.hidden=false;p.textContent=typeof err==="string"?err:"No se pudo guardar ("+(err&&(err.message||err.code)||"error")+"). Revisa la conexión y vuelve a intentarlo.";}
 async function toWebp(file){
   const bmp=await createImageBitmap(file);const m=1600/Math.max(bmp.width,bmp.height),s=Math.min(1,m);
   const cv=document.createElement("canvas");cv.width=Math.round(bmp.width*s);cv.height=Math.round(bmp.height*s);cv.getContext("2d").drawImage(bmp,0,0,cv.width,cv.height);
@@ -1459,7 +1461,7 @@ function newWire(){
   $("#esc").textContent="Escala "+escalaTxt(k);
   wireEditor();
   const redraw=()=>{readForm();$("#fmeta").innerHTML=editorHTML(e);newWire();};
-  [0,1].forEach(i=>$("#e-f"+i).onchange=ev=>{const file=ev.target.files[0];if(!file)return;readForm();e.files[i]=file;e.previews[i]=URL.createObjectURL(file);
+  [0,1].forEach(i=>$("#e-f"+i).onchange=async ev=>{const f0=ev.target.files[0];if(!f0)return;readForm();const file=await procesarImagen(f0);readForm();e.files[i]=file;e.previews[i]=URL.createObjectURL(file);
     if(i===0){const im=new Image();im.onload=()=>{if(!+e.ancho){e.ancho=Math.round(im.naturalWidth/450*25.4);e.alto=Math.round(im.naturalHeight/450*25.4);}$("#fmeta").innerHTML=editorHTML(e);newWire();};im.src=e.previews[0];}else redraw();});
   $("#e-cancel").onclick=()=>{editing=null;closeFicha();};
   $("#e-ancho").oninput=$("#e-alto").oninput=()=>{readForm();const k2=stageScale();c.style.width=(+e.ancho||85)*k2+"px";c.style.height=(+e.alto||55)*k2+"px";};
@@ -2285,6 +2287,130 @@ db.collection("piezas").onSnapshot(snap=>{
   $("#vacio").hidden=!(UID&&!D.length);document.body.classList.toggle("sinpiezas",!!UID&&!D.length);
   if(!editing){render();if(!$("#ficha").hidden&&cur())drawFicha();}
 },()=>{});
+
+
+/* ---------- Recorte automático del fondo y cámara ---------- */
+const recOn=()=>{try{return localStorage.getItem("arch-rec")!=="0";}catch(e){return true;}};
+
+/* Color Lab para medir diferencias como las ve el ojo (una sombra suave no cuenta como objeto) */
+function lab(r,g,b){
+  r/=255;g/=255;b/=255;
+  r=r>.04045?Math.pow((r+.055)/1.055,2.4):r/12.92;g=g>.04045?Math.pow((g+.055)/1.055,2.4):g/12.92;b=b>.04045?Math.pow((b+.055)/1.055,2.4):b/12.92;
+  let x=(r*.4124+g*.3576+b*.1805)/.95047,y=r*.2126+g*.7152+b*.0722,z=(r*.0193+g*.1192+b*.9505)/1.08883;
+  const f=t=>t>.008856?Math.cbrt(t):7.787*t+16/116;x=f(x);y=f(y);z=f(z);
+  return [116*y-16,500*(x-y),200*(y-z)];
+}
+const mediana=a=>{a.sort((p,q)=>p-q);return a[a.length>>1]||0;};
+
+/* Quita el fondo: mide el color del borde de la foto, lo propaga hacia dentro y deja como objeto todo lo que no es fondo.
+   Devuelve {ok,file} o {ok:false,motivo}. Funciona bien con fondos lisos (escáner, mesa, pared, papel). */
+async function recortarFondo(file){
+  const bmp=await createImageBitmap(file);
+  const k=Math.min(1,1600/Math.max(bmp.width,bmp.height)),w=Math.max(2,Math.round(bmp.width*k)),h=Math.max(2,Math.round(bmp.height*k));
+  const cv=document.createElement("canvas");cv.width=w;cv.height=h;
+  const cx=cv.getContext("2d",{willReadFrequently:true});cx.drawImage(bmp,0,0,w,h);
+  const id=cx.getImageData(0,0,w,h),px=id.data,N=w*h;
+  const grosor=Math.max(2,Math.round(Math.min(w,h)*.012));
+  const enBorde=(x,y)=>x<grosor||y<grosor||x>=w-grosor||y>=h-grosor;
+  // ¿ya viene con fondo transparente?
+  let transp=0,nb=0;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){if(!enBorde(x,y))continue;nb++;if(px[(y*w+x)*4+3]<128)transp++;}
+  if(transp/nb>.5)return {ok:false,motivo:"La imagen ya tiene el fondo transparente"};
+  // color del fondo: mediana de los píxeles del borde
+  const L=new Float32Array(N),A=new Float32Array(N),B=new Float32Array(N);
+  for(let i=0;i<N;i++){const c=lab(px[i*4],px[i*4+1],px[i*4+2]);L[i]=c[0];A[i]=c[1];B[i]=c[2];}
+  const sL=[],sA=[],sB=[],paso=Math.max(1,Math.floor(nb/4000));let n=0;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){if(!enBorde(x,y))continue;if((n++)%paso)continue;const i=y*w+x;sL.push(L[i]);sA.push(A[i]);sB.push(B[i]);}
+  const bL=mediana(sL.slice()),bA=mediana(sA.slice()),bB=mediana(sB.slice());
+  const dist=i=>{const dl=(L[i]-bL)*.55,da=A[i]-bA,db=B[i]-bB;return Math.sqrt(dl*dl+da*da+db*db);};
+  const ds=[];for(let j=0;j<sL.length;j++){const dl=(sL[j]-bL)*.55,da=sA[j]-bA,db=sB[j]-bB;ds.push(Math.sqrt(dl*dl+da*da+db*db));}
+  const mdn=mediana(ds.slice()),ruido=mediana(ds.map(d=>Math.abs(d-mdn)));
+  const tol=Math.max(11,Math.min(36,9+4*ruido));
+  // fondo = lo parecido al color del borde y conectado con él
+  const fondo=new Uint8Array(N),pila=new Int32Array(N);let sp=0;
+  const mete=i=>{if(!fondo[i]&&dist(i)<=tol){fondo[i]=1;pila[sp++]=i;}};
+  for(let x=0;x<w;x++){mete(x);mete((h-1)*w+x);}for(let y=0;y<h;y++){mete(y*w);mete(y*w+w-1);}
+  while(sp){const i=pila[--sp],x=i%w,y=(i/w)|0;if(x>0)mete(i-1);if(x<w-1)mete(i+1);if(y>0)mete(i-w);if(y<h-1)mete(i+w);}
+  // objeto = lo demás; se quedan los trozos grandes y se descartan motas y polvo
+  let fg=new Uint8Array(N);for(let i=0;i<N;i++)fg[i]=fondo[i]?0:1;
+  const lab_=new Int32Array(N),areas=[0];let nl=0;
+  for(let s=0;s<N;s++){if(!fg[s]||lab_[s])continue;nl++;let a=0;sp=0;pila[sp++]=s;lab_[s]=nl;
+    while(sp){const i=pila[--sp];a++;const x=i%w,y=(i/w)|0;
+      if(x>0&&fg[i-1]&&!lab_[i-1]){lab_[i-1]=nl;pila[sp++]=i-1;}if(x<w-1&&fg[i+1]&&!lab_[i+1]){lab_[i+1]=nl;pila[sp++]=i+1;}
+      if(y>0&&fg[i-w]&&!lab_[i-w]){lab_[i-w]=nl;pila[sp++]=i-w;}if(y<h-1&&fg[i+w]&&!lab_[i+w]){lab_[i+w]=nl;pila[sp++]=i+w;}}
+    areas.push(a);}
+  const mayor=Math.max(0,...areas);
+  if(!mayor)return {ok:false,motivo:"No encuentro el objeto: el fondo y el objeto son del mismo color"};
+  let cuenta=0;for(let i=0;i<N;i++){if(fg[i]&&areas[lab_[i]]<mayor*.04)fg[i]=0;if(fg[i])cuenta++;}
+  const frac=cuenta/N;
+  if(frac<.01)return {ok:false,motivo:"No encuentro el objeto: el fondo y el objeto son del mismo color"};
+  if(frac>.93)return {ok:false,motivo:"No distingo el fondo del objeto; se usa la imagen completa"};
+  // borde: se aprieta un píxel para quitar el halo del fondo y se suaviza
+  const er=new Uint8Array(N);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;
+    er[i]=fg[i]&&(x>0?fg[i-1]:0)&&(x<w-1?fg[i+1]:0)&&(y>0?fg[i-w]:0)&&(y<h-1?fg[i+w]:0)?1:0;}
+  const al=new Float32Array(N);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){let s=0,c=0;
+    for(let dy=-1;dy<=1;dy++){const yy=y+dy;if(yy<0||yy>=h)continue;for(let dx=-1;dx<=1;dx++){const xx=x+dx;if(xx<0||xx>=w)continue;s+=er[yy*w+xx];c++;}}
+    const v=s/c,t=Math.max(0,Math.min(1,(v-.2)/.6));al[y*w+x]=t*t*(3-2*t);}
+  // recorte a la caja del objeto
+  let x0=w,y0=h,x1=-1,y1=-1;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){if(al[y*w+x]>.02){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;}}
+  const m=Math.max(1,Math.round(Math.min(w,h)*.004));x0=Math.max(0,x0-m);y0=Math.max(0,y0-m);x1=Math.min(w-1,x1+m);y1=Math.min(h-1,y1+m);
+  const cw=x1-x0+1,ch=y1-y0+1;
+  const out=document.createElement("canvas");out.width=cw;out.height=ch;
+  const oc=out.getContext("2d"),od=oc.createImageData(cw,ch);
+  for(let y=0;y<ch;y++)for(let x=0;x<cw;x++){const si=(y+y0)*w+(x+x0),o=(y*cw+x)*4;od.data[o]=px[si*4];od.data[o+1]=px[si*4+1];od.data[o+2]=px[si*4+2];od.data[o+3]=Math.round(al[si]*px[si*4+3]);}
+  oc.putImageData(od,0,0);
+  const blob=await new Promise(r=>out.toBlob(r,"image/webp",.92));
+  if(!blob)return {ok:false,motivo:"No se pudo generar la imagen recortada"};
+  return {ok:true,w:cw,h:ch,file:new File([blob],(file.name||"foto").replace(/\.[^.]+$/,"")+"-recorte.webp",{type:"image/webp"})};
+}
+
+/* Paso común al elegir una imagen (del dispositivo o de la cámara) */
+async function procesarImagen(file){
+  if(!recOn())return file;
+  try{
+    toast("Recortando el fondo…");
+    const r=await recortarFondo(file);
+    if(r.ok){toast("Fondo recortado");return r.file;}
+    toast(r.motivo);
+  }catch(err){toast("No se pudo abrir esa imagen para recortarla; se usa tal cual");}
+  return file;
+}
+
+/* Cámara: foto directa desde el dispositivo hacia el anverso o el reverso */
+async function abrirCamara(i){
+  const inp=$("#e-f"+i);if(!inp)return;
+  let stream=null,cara="environment";
+  const m=document.createElement("div");m.className="cam";m.setAttribute("role","dialog");m.setAttribute("aria-label","Cámara");
+  m.innerHTML='<div class="cam-in"><video playsinline autoplay muted></video><p class="mono cam-msg" hidden></p><div class="cam-bar mono"><button type="button" data-a="flip">Girar cámara</button><button type="button" data-a="snap" class="cam-snap">Hacer foto</button><button type="button" data-a="close">Cerrar</button></div></div>';
+  document.body.appendChild(m);
+  const v=m.querySelector("video"),msg=m.querySelector(".cam-msg");
+  const parar=()=>{if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;};
+  const cerrar=()=>{parar();m.remove();document.removeEventListener("keydown",tecla,true);};
+  const tecla=ev=>{if(ev.key==="Escape"){ev.stopPropagation();cerrar();}};
+  document.addEventListener("keydown",tecla,true);
+  const iniciar=async()=>{
+    parar();msg.hidden=true;
+    if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){msg.hidden=false;msg.textContent="Este navegador no deja usar la cámara. Elige una foto del dispositivo.";return;}
+    try{stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:cara},width:{ideal:1920},height:{ideal:1920}},audio:false});v.srcObject=stream;}
+    catch(e){msg.hidden=false;msg.textContent="No se pudo abrir la cámara. Permite el acceso en el navegador o elige una foto del dispositivo.";}
+  };
+  m.onclick=async ev=>{
+    const a=ev.target.dataset&&ev.target.dataset.a;
+    if(a==="close"||ev.target===m)cerrar();
+    else if(a==="flip"){cara=cara==="environment"?"user":"environment";iniciar();}
+    else if(a==="snap"){
+      if(!v.videoWidth)return;
+      const c=document.createElement("canvas");c.width=v.videoWidth;c.height=v.videoHeight;c.getContext("2d").drawImage(v,0,0);
+      const b=await new Promise(r=>c.toBlob(r,"image/jpeg",.92));cerrar();
+      const f=new File([b],"foto-"+Date.now()+".jpg",{type:"image/jpeg"}),dt=new DataTransfer();dt.items.add(f);
+      inp.files=dt.files;inp.dispatchEvent(new Event("change",{bubbles:true}));
+    }
+  };
+  iniciar();
+}
 
 </script>
 
