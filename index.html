@@ -710,20 +710,20 @@ details.blk:not([open]),#d-sel details.sec:not([open]){padding-bottom:0!importan
 </div>
 
 <main id="main"><p class="empty">Cargando el archivo…</p></main>
-<div id="acceso" hidden role="dialog" aria-modal="true" aria-labelledby="ac-t"><div class="ac-caja">
-  <span class="lbl">Tu archivo personal</span>
-  <h1 id="ac-t">your personal archive</h1>
-  <p class="ac-p">Guarda los objetos que conservas y mira cómo la memoria los enfoca, los apaga o los devuelve. Cada cuenta tiene su propio archivo, privado.</p>
+<div id="acceso" hidden role="dialog" aria-modal="true" aria-labelledby="ac-t"><div class="ac-libro">
+  <div class="ac-cab"><span class="lbl">Libro de registro</span><h1 id="ac-t">your personal archive</h1></div>
+  <div class="ac-fila"><span class="lbl">Objeto del archivo</span><p class="ac-p">Guarda los objetos que conservas y mira cómo la memoria los enfoca, los apaga o los devuelve. Cada cuenta tiene su propio archivo, privado.</p></div>
   <form id="acForm">
-    <div class="ac-tabs mono"><button type="button" id="acTabIn" aria-pressed="true">Entrar</button><button type="button" id="acTabUp" aria-pressed="false">Crear cuenta</button></div>
-    <div class="ac-f" id="acFMail"><label class="mono" for="acMail">Tu correo</label><input id="acMail" type="email" required autocomplete="email" placeholder="tu@correo.com"></div>
-    <div class="ac-f" id="acFPass"><label class="mono" for="acPass" id="acLPass">Contraseña</label><input id="acPass" type="password" required autocomplete="current-password" placeholder="Mínimo 8 caracteres"></div>
-    <button id="acBtn" class="mono">Entrar</button>
-    <p class="mono muted" id="acMsg"></p>
-    <p class="mono ac-links"><button type="button" id="acOlvido">He olvidado la contraseña</button><span>·</span><button type="button" id="acLink">Entrar con un enlace al correo</button></p>
+    <div class="ac-tabs"><button type="button" id="acTabIn" aria-pressed="true">Entrar</button><button type="button" id="acTabUp" aria-pressed="false">Crear cuenta</button></div>
+    <div class="ac-fila ac-f" id="acFMail"><label class="lbl" for="acMail">Tu correo</label><input id="acMail" type="email" required autocomplete="email" placeholder="tu@correo.com"></div>
+    <div class="ac-fila ac-f" id="acFPass"><label class="lbl" for="acPass" id="acLPass">Contraseña</label><input id="acPass" type="password" required autocomplete="current-password" placeholder="Mínimo 8 caracteres"></div>
+    <div class="ac-pie">
+      <p class="mono muted" id="acMsg"></p>
+      <div class="ac-pie-fila"><p class="mono ac-links"><button type="button" id="acOlvido">He olvidado la contraseña</button><button type="button" id="acLink">Entrar con un enlace al correo</button></p><button id="acBtn" class="sello">Entrar</button></div>
+    </div>
   </form>
 </div></div>
-<div id="vacio" hidden><div class="ac-caja"><span class="lbl">Archivo vacío</span><p class="ac-p">Todavía no hay nada aquí. Empieza por el objeto que más te cueste tirar.</p><button id="vacioAdd" class="mono">Añadir la primera pieza</button></div></div>
+<div id="vacio" hidden><div class="ac-libro"><div class="ac-fila"><span class="lbl">Archivo vacío</span><p class="ac-p">Todavía no hay nada aquí. Empieza por el objeto que más te cueste tirar.</p></div><div class="ac-pie"><div class="ac-pie-fila"><span></span><button id="vacioAdd" class="sello">Añadir la primera pieza</button></div></div></div></div>
 <div class="umbral" id="umbral" role="dialog" aria-modal="true" aria-labelledby="u-t"><div class="u-libro">
   <div class="u-cab">
     <div><span class="lbl">Libro de registro</span><h1>archivo.personal</h1></div>
