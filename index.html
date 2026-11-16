@@ -1378,7 +1378,7 @@ function editorHTML(e){
   const prev=i=>{const p=e.previews[i]||(e.img[i]?src(e.img[i]):null);return p?`<img src="${p}" alt="">`:`<span class="ph mono">—</span>`;};
   return `<form class="ed" id="edform" novalidate>
   <div class="mono muted">${e.isNew?"Nueva pieza":"Editar pieza"}</div><h1 id="f-title">${esc(e.titulo||"Sin título")}</h1>
-  <div class="fld"><label>Anverso${e.isNew?" (obligatorio)":""}</label><div class="drop">${prev(0)}<input type="file" id="e-f0" accept="image/*"></div><div class="e-tools mono"><button type="button" id="e-cam0">Hacer foto</button><button type="button" id="e-ret0">Retocar recorte</button><label class="e-rec"><input type="checkbox" id="e-rec"${recOn()?" checked":""}> Recortar el fondo</label></div></div>
+  <div class="fld"><label>Anverso${e.isNew?" (obligatorio)":""}</label><div class="drop">${prev(0)}<input type="file" id="e-f0" accept="image/*"></div><div class="e-tools mono"><button type="button" id="e-cam0">Hacer foto</button><button type="button" id="e-ret0">Retocar recorte</button><button type="button" id="e-det">Detectar datos</button><label class="e-rec"><input type="checkbox" id="e-rec"${recOn()?" checked":""}> Recortar el fondo</label></div></div>
   <div class="fld"><label>Reverso (opcional)</label><div class="drop">${prev(1)}<input type="file" id="e-f1" accept="image/*">${(e.img[1]||e.previews[1])?`<button type="button" class="mono muted" id="e-rm1">Quitar</button>`:""}</div><div class="e-tools mono"><button type="button" id="e-cam1">Hacer foto</button><button type="button" id="e-ret1">Retocar recorte</button></div></div>
   ${f("titulo","Título",e.titulo,'required')}
   <div class="row2">${f("tipo","Tipo",e.tipo,'list="dl-tipo" required')}${f("anio","Año",e.anio,'inputmode="numeric" placeholder="Sin fechar"')}</div>
@@ -1406,6 +1406,7 @@ function wireEditor(){
     if(i===0&&(!+e.ancho||!+e.alto)){const im=new Image();im.onload=()=>{if(!+e.ancho){e.ancho=Math.round(im.naturalWidth/450*25.4);e.alto=Math.round(im.naturalHeight/450*25.4);}drawFicha();};im.src=e.previews[0];}else drawFicha();});
   if($("#e-rec"))$("#e-rec").onchange=ev=>{try{localStorage.setItem("arch-rec",ev.target.checked?"1":"0");}catch(_){}};
   [0,1].forEach(i=>{const b=$("#e-cam"+i);if(b)b.onclick=()=>abrirCamara(i);const r=$("#e-ret"+i);if(r)r.onclick=()=>retocarRecorte(i);});
+  if($("#e-det"))$("#e-det").onclick=async()=>{const f=(editing&&editing.files&&editing.files[0])||null;const p=editing&&(editing.previews[0]||(editing.img&&editing.img[0]?src(editing.img[0]):null));if(f)detectarDatos(f,true);else if(p){try{detectarDatos(await fetch(p).then(r=>r.blob()),true);}catch(e){toast("No se pudo abrir la imagen");}}else toast("Elige primero una imagen");};
   $("#e-snd").onchange=async ev=>{const f=ev.target.files[0];ev.target.value="";if(!f)return;readForm();try{const a=await trimmer(f,e.titulo);e.sonidoFile=new File([a.blob],f.name.replace(/\.[^.]+$/,"")+(a.type==="video/webm"?".webm":".mp4"),{type:a.type});}catch(err){if(err!=="cancel")toast(typeof err==="string"?err:"No se pudo leer el audio");}drawFicha();};
   if($("#e-sndrm"))$("#e-sndrm").onclick=()=>{readForm();e.sonidoFile=null;e.sonido=null;drawFicha();};
   if($("#e-rm1")) $("#e-rm1").onclick=()=>{readForm();e.files[1]=null;e.previews[1]=null;e.img=e.img.slice(0,1);drawFicha();};
@@ -2483,17 +2484,24 @@ async function recortarFondo(file,conIA){
 const ORIG=[null,null];   // por cara: {orig: foto sin recortar, res: lo que se guardó}
 async function procesarImagen(file,i){
   const inp=i!=null?$("#e-f"+i):null;
-  const fija=out=>{if(i!=null&&ORIG[i])ORIG[i].res=out;return out;};
-  if(inp&&inp.dataset.noRec){delete inp.dataset.noRec;return fija(file);}   // viene del editor de retoque: ya está recortada
-  if(i!=null)ORIG[i]={orig:file,res:null};
-  if(!recOn())return fija(file);
-  try{
-    toast("Recortando el fondo…");
-    const r=await recortarFondo(file);
-    if(r.ok){toast("Fondo recortado. Puedes retocarlo con «Retocar recorte»");return fija(r.file);}
-    toast(r.motivo);
-  }catch(err){toast("No se pudo abrir esa imagen para recortarla; se usa tal cual");}
-  return fija(file);
+  let out=file,detectar=true;
+  if(inp&&inp.dataset.noRec){                     // viene del editor de retoque: ya está recortada
+    delete inp.dataset.noRec;detectar=false;
+    if(i!=null&&ORIG[i])ORIG[i].res=file;
+  }else{
+    if(i!=null)ORIG[i]={orig:file,res:null};
+    if(recOn()){
+      try{
+        toast("Recortando el fondo…");
+        const r=await recortarFondo(file);
+        if(r.ok){toast("Fondo recortado. Puedes retocarlo con «Retocar recorte»");out=r.file;}
+        else toast(r.motivo);
+      }catch(err){toast("No se pudo abrir esa imagen para recortarla; se usa tal cual");}
+    }
+    if(i!=null&&ORIG[i])ORIG[i].res=out;
+  }
+  if(detectar&&i===0&&typeof detectarDatos==="function")setTimeout(()=>{detectarDatos(out,false).catch(()=>{});},250);
+  return out;
 }
 
 /* ---------- Editor de retoque: borrar, recuperar, varita y recorte automático ---------- */
@@ -2646,6 +2654,125 @@ async function abrirCamara(i){
     }
   };
   iniciar();
+}
+
+
+/* ---------- Detección automática: título, tipo, ámbitos, ancla y año ---------- */
+let CLIPP=null,OCRP=null,DET_SEQ=0;
+function cargarClip(){
+  if(!CLIPP)CLIPP=(async()=>{
+    const T=await import("https://cdn.jsdelivr.net/npm/@huggingface/transformers@3");
+    return await T.pipeline("zero-shot-image-classification","Xenova/clip-vit-base-patch32",{dtype:"q8",device:"wasm"});
+  })().catch(e=>{CLIPP=null;throw e;});
+  return CLIPP;
+}
+function cargarOcr(){
+  if(!OCRP)OCRP=(async()=>{
+    const M=await import("https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.esm.min.js");
+    return await M.createWorker("spa+eng",1,{workerPath:"https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js",corePath:"https://cdn.jsdelivr.net/npm/tesseract.js-core@5"});
+  })().catch(e=>{OCRP=null;throw e;});
+  return OCRP;
+}
+/* El tipo se reconoce por la forma del objeto; cada tipo del archivo con su descripción en inglés, que es lo que entiende el modelo */
+const DET_TIPOS=[
+["Entrada","an admission ticket to a museum, concert or match"],
+["Billete","a transport ticket, boarding pass or train ticket"],
+["Vinilo","a vinyl record album cover"],
+["CD","a compact disc album in a case"],
+["Casete","an audio cassette tape"],
+["Bufanda","a football team scarf"],
+["Camiseta","a t-shirt or football jersey"],
+["Sudadera","a hoodie sweatshirt"],
+["Gorra","a baseball cap"],
+["Pegatina","a die-cut sticker"],
+["Cromo","a collectible trading card"],
+["Postal","a postcard"],
+["Folleto","a printed brochure, flyer or leaflet"],
+["Cartel","a poster"],
+["Libro","a book cover"],
+["Revista","a magazine cover"],
+["Marcapáginas","a bookmark"],
+["Foto","a printed photograph"],
+["Tarjeta de visita","a business card"],
+["Pulsera","a festival fabric wristband"],
+["Carnet","a membership card or plastic ID card"],
+["Imán","a fridge magnet"],
+["Llavero","a keychain"],
+["Chapa","a small round pin badge"],
+["Muñeco","a toy figure or plush"],
+["Mapa","a folded city map"],
+["Pasaporte","a passport booklet"]];
+/* Palabras en el propio objeto que fijan el tipo por encima del modelo */
+const DET_KW=[[/\b(entrada|ticket|admission|admit|eintritt|biglietto)\b/,"Entrada"],[/\b(boarding|renfe|metro|embarque|coach|anden|vuelo|flight)\b/,"Billete"],[/\b(postal|postcard|carte postale)\b/,"Postal"],[/\b(passport|pasaporte|reisepass)\b/,"Pasaporte"]];
+const DET_RUIDO=/^(entrada|entradas|ticket|tickets|admit|admission|general|adulto|adult|precio|price|total|iva|vat|fecha|date|hora|fila|asiento|seat|row|puerta|gate|zona|sala|nº|no\.|ref|www\.|http)/i;
+function detLineas(data){
+  const ls=[];
+  (data.blocks||[]).forEach(b=>(b.paragraphs||[]).forEach(p=>(p.lines||[]).forEach(l=>ls.push(l))));
+  if(!ls.length&&Array.isArray(data.lines))ls.push(...data.lines);
+  return ls.map(l=>({t:(l.text||"").replace(/\s+/g," ").trim(),c:l.confidence||0,h:l.bbox?(l.bbox.y1-l.bbox.y0):0}))
+    .filter(l=>l.t.length>=3&&l.t.length<=60&&l.c>=55&&/[a-záéíóúüñ]/i.test(l.t));
+}
+function titulin(s){
+  s=s.replace(/[|_~•·]+/g," ").replace(/\s+/g," ").trim();
+  if(s===s.toUpperCase()&&/[A-ZÁÉÍÓÚÜÑ]/.test(s))s=s.toLowerCase().replace(/(^|[\s([«"'-])\p{L}/gu,m=>m.toUpperCase());
+  return s;
+}
+async function detectarDatos(file,manual){
+  const miSeq=++DET_SEQ;
+  toast(manual?"Leyendo la pieza… (la primera vez descarga los modelos)":"Leyendo la pieza para rellenar la ficha…");
+  const [rc,ro]=await Promise.allSettled([
+    (async()=>{const z=await cargarClip();const u=URL.createObjectURL(file);try{return await z(u,DET_TIPOS.map(x=>x[1]));}finally{URL.revokeObjectURL(u);}})(),
+    (async()=>{const w=await cargarOcr();const r=await w.recognize(file);return r.data;})()
+  ]);
+  if(miSeq!==DET_SEQ||!$("#edform"))return;   // llegó otra foto, o el editor ya no está
+  if(rc.status==="rejected"&&ro.status==="rejected"){if(manual)toast("No se pudieron cargar los modelos de detección. Revisa la conexión.");return;}
+  const sug={};
+  let texto="",lineas=[];
+  if(ro.status==="fulfilled"&&ro.value){texto=fold(ro.value.text||"");lineas=detLineas(ro.value);}
+  // tipo: el modelo propone y las palabras del objeto mandan
+  let tipo=null;
+  if(rc.status==="fulfilled"&&Array.isArray(rc.value)&&rc.value.length){
+    const top=rc.value[0],ent=DET_TIPOS.find(x=>x[1]===top.label);
+    if(ent&&top.score>=0.18)tipo=ent[0];
+  }
+  for(const [re,t] of DET_KW)if(re.test(" "+texto+" ")){tipo=t;break;}
+  if(tipo)sug.tipo=tipo;
+  // título: la línea más prominente que no sea ruido de taquilla
+  const cand=lineas.filter(l=>!DET_RUIDO.test(l.t)).sort((a,b)=>b.h*(b.c/100)-a.h*(a.c/100));
+  if(cand.length)sug.titulo=titulin(cand[0].t).slice(0,80);
+  // ancla: primero las anclas que ya existen en el archivo; si no, un nombre corto y prominente
+  const usadas=typeof countBy==="function"?[...countBy("ancla").keys()].filter(a=>a&&a!=="Sin ancla"):[];
+  const foldT=fold([texto,...lineas.map(l=>l.t)].join(" "));
+  const halladas=usadas.filter(a=>a.length>=3&&foldT.includes(fold(a))).slice(0,3);
+  if(halladas.length)sug.ancla=halladas.join(", ");
+  else{const ok=l=>l.t.split(" ").length<=5&&!/\d{3,}/.test(l.t);const a=cand.slice(1).find(ok)||cand.find(ok);if(a)sug.ancla=titulin(a.t);}
+  // ámbitos: pistas en el texto + lo que implica el tipo
+  const amb=new Set();
+  if(typeof AMB_HINTS!=="undefined")AMB_HINTS.forEach(([re,a])=>{if(re.test(foldT))amb.add(a);});
+  const porTipo={Vinilo:"Música",CD:"Música",Casete:"Música",Bufanda:"Deporte",Billete:"Viajes",Pasaporte:"Viajes",Mapa:"Viajes",Libro:"Literatura",Revista:"Literatura",Marcapáginas:"Literatura"};
+  if(tipo&&porTipo[tipo])amb.add(porTipo[tipo]);
+  if(amb.size)sug.ambitos=[...amb].slice(0,3);
+  // año
+  const y=((ro.status==="fulfilled"?String(ro.value.text||""):"").match(/\b(19[5-9]\d|20[0-4]\d)\b/)||[])[1];
+  if(y)sug.anio=y;
+  aplicarSugerencias(sug,manual);
+}
+function aplicarSugerencias(sug,manual){
+  const puestos=[];
+  const pon=(k,v,nombre)=>{const el=$("#e-"+k);if(v&&el&&!el.value.trim()){el.value=v;puestos.push(nombre||k);if(k==="titulo"&&$("#f-title"))$("#f-title").textContent=v;}};
+  pon("titulo",sug.titulo,"título");
+  pon("tipo",sug.tipo);
+  pon("ancla",sug.ancla);
+  pon("anio",sug.anio,"año");
+  if(sug.ambitos&&$("#e-ambito")&&!$("#e-ambito").value.trim()){
+    $("#e-ambito").value=sug.ambitos.join(", ");
+    const pick=$("#e-ambpick");
+    if(pick)pick.querySelectorAll(".achip").forEach(b=>b.setAttribute("aria-pressed",String(sug.ambitos.includes(b.dataset.a))));
+    puestos.push("ámbitos");
+  }
+  if(typeof readForm==="function"&&typeof editing!=="undefined"&&editing)readForm();
+  if(puestos.length)toast("Detectado y rellenado: "+puestos.join(", ")+". Revísalo y corrige lo que no encaje.");
+  else if(manual)toast("No encuentro nada nuevo que rellenar: no leo texto claro o los campos ya están completos.");
 }
 
 </script>
