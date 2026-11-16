@@ -2669,7 +2669,8 @@ function cargarClip(){
 function cargarOcr(){
   if(!OCRP)OCRP=(async()=>{
     const M=await import("https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.esm.min.js");
-    return await M.createWorker("spa+eng",1,{workerPath:"https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js",corePath:"https://cdn.jsdelivr.net/npm/tesseract.js-core@5"});
+    const T=M.default||M;
+    return await T.createWorker("spa+eng",1,{workerPath:"https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/worker.min.js",corePath:"https://cdn.jsdelivr.net/npm/tesseract.js-core@5"});
   })().catch(e=>{OCRP=null;throw e;});
   return OCRP;
 }
